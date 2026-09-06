@@ -132,13 +132,13 @@ def get():
 @accept_model_fields(UserCreateModel)
 async def post(**kwargs):
     # Adjust this URL to match your FastAPI signup route exactly
-    api_url = f"{current_url}{backend_prefix}/auth/signup/"
+    api_url = f"{current_url}{backend_prefix}/auth/signup"
     print("api_url: ", api_url)
     
     payload = {key: val for key, val in kwargs.items()}
     
     timeout = 30.0 # For email to be sent
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
         api_response = await client.post(api_url, json=payload)
         
     if api_response.status_code in (200, 201):
