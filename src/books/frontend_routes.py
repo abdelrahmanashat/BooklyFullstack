@@ -90,7 +90,7 @@ async def get_books(request: Request):
 # ==========================================
 
 @rt('/books/create')
-def get_create_book(request: Request):
+def get(request: Request):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
@@ -108,7 +108,7 @@ def get_create_book(request: Request):
 
 @rt('/books/create')
 @accept_model_fields(BookCreateModel)
-async def post_create_book(request: Request, **kwargs):
+async def post(request: Request, **kwargs):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
@@ -139,7 +139,7 @@ async def post_create_book(request: Request, **kwargs):
 # ==========================================
 
 @rt('/books/{uid}')
-async def get_book_details(uid: uuid.UUID, request: Request):
+async def get(uid: uuid.UUID, request: Request):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
@@ -202,7 +202,7 @@ async def close_book_details(uid: uuid.UUID):
 # ==========================================
 
 @rt('/books/{uid}/edit')
-async def get_edit_book(uid: uuid.UUID, request: Request):
+async def get(uid: uuid.UUID, request: Request):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
@@ -231,7 +231,7 @@ async def get_edit_book(uid: uuid.UUID, request: Request):
 
 @rt('/books/{uid}/edit')
 @accept_model_fields(BookUpdateModel)
-async def post_edit_book(uid: uuid.UUID, request: Request, **kwargs):
+async def post(uid: uuid.UUID, request: Request, **kwargs):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
@@ -263,7 +263,7 @@ async def post_edit_book(uid: uuid.UUID, request: Request, **kwargs):
 # ==========================================
 
 @rt('/books/{uid}/delete')
-async def get_delete_book(uid: uuid.UUID, request: Request):
+async def get(uid: uuid.UUID, request: Request):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
@@ -295,7 +295,7 @@ async def get_delete_book(uid: uuid.UUID, request: Request):
     ), cls="container")
 
 @rt('/books/{uid}/delete')
-async def post_delete_book(uid: uuid.UUID, request: Request):
+async def post(uid: uuid.UUID, request: Request):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
