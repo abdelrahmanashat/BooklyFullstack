@@ -247,3 +247,21 @@ async def post(token: str, **kwargs):
             A("Try Again", href=f"{frontend_prefix}/password-reset-confirm/{token}", cls="button secondary")
         ), cls="container")
 
+# ==========================================
+# LOGOUT ROUTE
+# ==========================================
+
+@rt('/logout')
+async def logout(request: Request):
+    # Retrieve the token to blacklist it on the backend
+    token = request.cookies.get("access_token")
+    if token:
+        api_url = f"{current_url}{backend_prefix}/auth/logout"
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            await client.get(api_url, headers=headers)
+            
+    # Clear the UI cookie and return to login screen
+    ui_response = RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
+    ui_response.delete_cookie(key="access_token")
+    return ui_response
