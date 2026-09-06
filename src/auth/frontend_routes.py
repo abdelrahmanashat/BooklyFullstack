@@ -127,6 +127,7 @@ def get():
 async def post(**kwargs):
     # Adjust this URL to match your FastAPI signup route exactly
     api_url = f"{current_url}{backend_prefix}/auth/signup"
+    print("api_url: ", api_url)
     
     payload = {key: val for key, val in kwargs.items()}
     
@@ -135,17 +136,19 @@ async def post(**kwargs):
         api_response = await client.post(api_url, json=payload)
         
     if api_response.status_code in (200, 201):
-        email = kwargs.pop("email")
         return Titled("Success", Main(
             P("Account created successfully!"), 
-            P(f"Check your email: {email} for verification!"),
-            Div(
-                A("Go to Login", href=f"{frontend_prefix}/", cls="button")
-            )
+            A("Go to Login", href=f"{frontend_prefix}/", cls="button")
         ), cls="container")
     else:
-        # Show the error message returned from the backend if possible
-        error_detail = api_response.json().get("detail", "Failed to create account.")
+        # Safely attempt to parse JSON, fallback if it is an HTML error page
+        try:
+            error_detail = api_response.json().get("detail", "Failed to create account.")
+        except Exception:
+            error_detail = f"Server Error {api_response.status_code}: Something went wrong in the background."
+            # Print the raw text to your Render logs so you can see the real error!
+            print(f"RAW BACKEND ERROR: {api_response.text}") 
+            
         return Titled("Error", Main(
             P(error_detail, style="color: red;"), 
             A("Try Again", href=f"{frontend_prefix}/signup", cls="button secondary")
