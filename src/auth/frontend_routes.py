@@ -149,7 +149,7 @@ async def post(**kwargs):
     else:
         # Safely attempt to parse JSON, fallback if it is an HTML error page
         try:
-            error_detail = api_response.json().get("detail", "Failed to create account.")
+            error_detail = api_response.json().get("initial_detail", "Failed to create account.")
         except Exception:
             error_detail = f"Server Error {api_response.status_code}: Something went wrong in the background."
             # Print the raw text to your Render logs so you can see the real error!
