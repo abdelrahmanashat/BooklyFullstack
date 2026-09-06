@@ -31,20 +31,7 @@ role_checker = RoleChecker(['admin','user'])
 frontend_prefix = url_names.frontend_url
 backend_prefix = url_names.version_prefix
 
-REFRESH_TOKEN_EXPIRY = 2
-
-def send_verification_mail(email:str, bg_tasks: BackgroundTasks):
-    token = create_url_safe_token({"email":email})
-    link = f"http://{Config.DOMAIN}{frontend_prefix}/verification-done/{token}"
-    html_message = f"""
-    <h1>Verify your email</h1>
-    <p>Please click this <a href="{link}">link</a> to verify your email</p>
-    """
-    emails = [email]
-    subject="Verify your email"
-    #send_email.delay(emails, subject, html_message)
-    bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
-    
+REFRESH_TOKEN_EXPIRY = 2    
 
 @auth_router.post('/send_mail')
 async def send_mail(emails:EmailModel, bg_tasks: BackgroundTasks):
@@ -56,27 +43,45 @@ async def send_mail(emails:EmailModel, bg_tasks: BackgroundTasks):
     return {"message":"Email sent successfully"}
 
 @auth_router.post('/send_verification', status_code=status.HTTP_200_OK)
-async def create_user_account(user_data:PasswordResetRequestModel, session:AsyncSession = Depends(get_session)):
+async def create_user_account(user_data:PasswordResetRequestModel, bg_tasks: BackgroundTasks, session:AsyncSession = Depends(get_session)):
     email = user_data.email
     user_exists = await user_service.user_exists(email, session)
     if not user_exists: 
         raise UserNotFound()
     
-    send_verification_mail(email)
+    token = create_url_safe_token({"email":email})
+    link = f"http://{Config.DOMAIN}{frontend_prefix}/verification-done/{token}"
+    html_message = f"""
+    <h1>Verify your email</h1>
+    <p>Please click this <a href="{link}">link</a> to verify your email</p>
+    """
+    emails = [email]
+    subject="Verify your email"
+    #send_email.delay(emails, subject, html_message)
+    bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
     
     return {
         "message" : f"Check your email: {email} to verify your account"
     }
 
 @auth_router.post('/signup', status_code=status.HTTP_201_CREATED)
-async def create_user_account(user_data:UserCreateModel, session:AsyncSession = Depends(get_session)):
+async def create_user_account(user_data:UserCreateModel, bg_tasks: BackgroundTasks, session:AsyncSession = Depends(get_session)):
     email = user_data.email
     user_exists = await user_service.user_exists(email, session)
     if user_exists: 
         raise UserAlreadyExists()
     new_user = await user_service.create_user(user_data, session)
     
-    send_verification_mail(email)
+    token = create_url_safe_token({"email":email})
+    link = f"http://{Config.DOMAIN}{frontend_prefix}/verification-done/{token}"
+    html_message = f"""
+    <h1>Verify your email</h1>
+    <p>Please click this <a href="{link}">link</a> to verify your email</p>
+    """
+    emails = [email]
+    subject="Verify your email"
+    #send_email.delay(emails, subject, html_message)
+    bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
     
     return {
         "message" : f"Account Created! Check your email: {email} to verify your account",
