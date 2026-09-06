@@ -41,6 +41,8 @@ ui_app, rt = fast_app()
 # Import frontend routes
 import src.auth.frontend_routes
 import src.books.frontend_routes
+import src.reviews.frontend_routes
+import src.tags.frontend_routes
 
 # Mount the FastHTML application under the "/ui" path
 app.mount(url_names.frontend_url, ui_app)

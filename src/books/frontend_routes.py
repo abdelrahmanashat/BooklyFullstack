@@ -86,6 +86,55 @@ async def get_books(request: Request):
     ), cls="container")
 
 # ==========================================
+# CREATE NEW BOOK
+# ==========================================
+
+@rt('/books/create')
+def get_create_book(request: Request):
+    headers = get_auth_headers(request)
+    if not headers:
+        return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
+        
+    form = generate_form_from_model(
+        model=BookCreateModel,
+        submit_url=f"{frontend_prefix}/books/create",
+        submit_text="Save Book"
+    )
+    
+    return Titled("Add a Book", Main(
+        form, 
+        P(A("Cancel & Back to Library", href=f"{frontend_prefix}/books", cls="secondary"))
+    ), cls="container")
+
+@rt('/books/create')
+@accept_model_fields(BookCreateModel)
+async def post_create_book(request: Request, **kwargs):
+    headers = get_auth_headers(request)
+    if not headers:
+        return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
+        
+    api_url = f"{current_url}{backend_prefix}/book"
+    payload = {key: val for key, val in kwargs.items()}
+    
+    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        api_response = await client.post(api_url, json=payload, headers=headers)
+        
+    if api_response.status_code in (200, 201):
+        # Redirect back to the library upon success
+        return RedirectResponse(url=f"{frontend_prefix}/books", status_code=303)
+    else:
+        try:
+            error_data = api_response.json()
+            error_msg = error_data.get("message", "Failed to add book.")
+        except Exception:
+            error_msg = f"Server Error {api_response.status_code}: Something went wrong."
+            
+        return Titled("Error", Main(
+            P(error_msg, style="color: red;"),
+            A("Try Again", href=f"{frontend_prefix}/books/create", cls="button secondary")
+        ), cls="container")
+
+# ==========================================
 # BOOK DETAILS SUBMENU (HTMX TOGGLE)
 # ==========================================
 
@@ -147,55 +196,6 @@ async def close_book_details(uid: uuid.UUID):
         hx_target=f"#book-wrapper-{uid}", 
         hx_swap="innerHTML"
     )
-
-# ==========================================
-# CREATE NEW BOOK
-# ==========================================
-
-@rt('/books/create')
-def get_create_book(request: Request):
-    headers = get_auth_headers(request)
-    if not headers:
-        return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
-        
-    form = generate_form_from_model(
-        model=BookCreateModel,
-        submit_url=f"{frontend_prefix}/books/create",
-        submit_text="Save Book"
-    )
-    
-    return Titled("Add a Book", Main(
-        form, 
-        P(A("Cancel & Back to Library", href=f"{frontend_prefix}/books", cls="secondary"))
-    ), cls="container")
-
-@rt('/books/create')
-@accept_model_fields(BookCreateModel)
-async def post_create_book(request: Request, **kwargs):
-    headers = get_auth_headers(request)
-    if not headers:
-        return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
-        
-    api_url = f"{current_url}{backend_prefix}/book"
-    payload = {key: val for key, val in kwargs.items()}
-    
-    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-        api_response = await client.post(api_url, json=payload, headers=headers)
-        
-    if api_response.status_code in (200, 201):
-        # Redirect back to the library upon success
-        return RedirectResponse(url=f"{frontend_prefix}/books", status_code=303)
-    else:
-        try:
-            error_data = api_response.json()
-            error_msg = error_data.get("message", "Failed to add book.")
-        except Exception:
-            error_msg = f"Server Error {api_response.status_code}: Something went wrong."
-            
-        return Titled("Error", Main(
-            P(error_msg, style="color: red;"),
-            A("Try Again", href=f"{frontend_prefix}/books/create", cls="button secondary")
-        ), cls="container")
 
 # ==========================================
 # UPDATE BOOK
