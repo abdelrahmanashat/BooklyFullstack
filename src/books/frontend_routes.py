@@ -37,14 +37,24 @@ async def get_books(request: Request):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    api_url = f"{current_url}{backend_prefix}/books" 
+    # NOTE: Added a trailing slash here since your routes_2.py defines it as get('/')
+    api_url = f"{current_url}{backend_prefix}/books/" 
     
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
         
-    if api_response.status_code == 401:
-        # Token expired or invalid
-        return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
+    # FIX: Catch ALL errors, not just 401s!
+    if api_response.status_code != 200:
+        try:
+            error_data = api_response.json()
+            error_msg = error_data.get("message", f"Failed to load books. Status: {api_response.status_code}")
+        except Exception:
+            error_msg = f"Server Error {api_response.status_code}: Something went wrong."
+            
+        return Titled("Error", Main(
+            P(error_msg, style="color: red;"),
+            A("Go to Login", href=f"{frontend_prefix}/", cls="button secondary outline")
+        ), cls="container")
         
     books_data = api_response.json() 
     
@@ -53,7 +63,6 @@ async def get_books(request: Request):
         Li(
             Strong(book.get("title", "Untitled")),
             
-            # The HTMX target wrapper for the toggleable submenu
             Div(
                 Button("Details", 
                        hx_get=f"{frontend_prefix}/books/{book.get('uid')}", 
