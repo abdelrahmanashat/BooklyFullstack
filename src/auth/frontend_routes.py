@@ -7,7 +7,13 @@ from src.utlis import generate_form_from_model, accept_model_fields
 from src.auth.schemas import UserCreateModel, PasswordResetRequestModel, PasswordResetConfirmModel
 from src import rt
 
-current_url = f"http://{Config.DOMAIN}"
+# Dynamically choose http or https
+if "localhost" in Config.DOMAIN or "127.0.0.1" in Config.DOMAIN:
+    scheme = "http"
+else:
+    scheme = "https"
+
+current_url = f"{scheme}://{Config.DOMAIN}"
 frontend_prefix = url_names.frontend_url
 backend_prefix = url_names.version_prefix
 
