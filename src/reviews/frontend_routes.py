@@ -38,7 +38,7 @@ async def get_book_reviews(book_uid: uuid.UUID, request: Request):
     if not headers:
         return P("Please log in to view reviews.", style="color: red;")
         
-    api_url = f"{current_url}{backend_prefix}/books/{book_uid}/reviews" 
+    api_url = f"{current_url}{backend_prefix}/book/{book_uid}/reviews" 
     
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
@@ -97,7 +97,7 @@ async def post_create_review(book_uid: uuid.UUID, request: Request, **kwargs):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    api_url = f"{current_url}{backend_prefix}/books/{book_uid}/reviews"
+    api_url = f"{current_url}{backend_prefix}/book/{book_uid}/reviews"
     payload = {key: val for key, val in kwargs.items()}
     
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
