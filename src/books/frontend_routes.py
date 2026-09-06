@@ -38,7 +38,7 @@ async def get_books(request: Request):
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
     # NOTE: Added a trailing slash here since your routes_2.py defines it as get('/')
-    api_url = f"{current_url}{backend_prefix}/books/" 
+    api_url = f"{current_url}{backend_prefix}/book/" 
     
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
@@ -95,7 +95,7 @@ async def get_book_details(uid: uuid.UUID, request: Request):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
 
-    api_url = f"{current_url}{backend_prefix}/books/{uid}"
+    api_url = f"{current_url}{backend_prefix}/book/{uid}"
     
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
@@ -176,7 +176,7 @@ async def post_create_book(request: Request, **kwargs):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    api_url = f"{current_url}{backend_prefix}/books"
+    api_url = f"{current_url}{backend_prefix}/book"
     payload = {key: val for key, val in kwargs.items()}
     
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -208,7 +208,7 @@ async def get_edit_book(uid: uuid.UUID, request: Request):
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
     # 1. (Optional) Fetch the existing book so you can display its current title
-    api_url = f"{current_url}{backend_prefix}/books/{uid}"
+    api_url = f"{current_url}{backend_prefix}/book/{uid}"
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
         
@@ -236,7 +236,7 @@ async def post_edit_book(uid: uuid.UUID, request: Request, **kwargs):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    api_url = f"{current_url}{backend_prefix}/books/{uid}"
+    api_url = f"{current_url}{backend_prefix}/book/{uid}"
     
     # Filter out empty fields if BookUpdateModel makes them optional
     payload = {key: val for key, val in kwargs.items() if val is not None and val != ""}
@@ -269,7 +269,7 @@ async def get_delete_book(uid: uuid.UUID, request: Request):
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
     # Fetch the book to show the user what they are deleting
-    api_url = f"{current_url}{backend_prefix}/books/{uid}"
+    api_url = f"{current_url}{backend_prefix}/book/{uid}"
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
         
@@ -300,7 +300,7 @@ async def post_delete_book(uid: uuid.UUID, request: Request):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    api_url = f"{current_url}{backend_prefix}/books/{uid}"
+    api_url = f"{current_url}{backend_prefix}/book/{uid}"
     
     # Issue the DELETE request to the backend
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
