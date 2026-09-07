@@ -4,3 +4,4 @@ env/
 __pycache__
 .env
 .env.docker
+.sesskey
