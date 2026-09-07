@@ -7,7 +7,7 @@ from datetime import timedelta, datetime
 from src.db.main import get_session
 from src.db.redis import add_jti_to_blocklist
 from src.mail_non_celery import send_email_via_api
-#from src.celery_tasks import send_email
+from src.celery_tasks import send_email
 
 from .schemas import (UserCreateModel, 
                       UserLoginModel, 
@@ -24,6 +24,11 @@ from src.config import Config
 
 from src.url_names import url_names
 
+if "localhost" in Config.DOMAIN or "127.0.0.1" in Config.DOMAIN:
+    celery_active = True
+else:
+    celery_active = False
+
 auth_router = APIRouter()
 user_service = UserService()
 role_checker = RoleChecker(['admin','user'])
@@ -38,8 +43,10 @@ async def send_mail(emails:EmailModel, bg_tasks: BackgroundTasks):
     emails = emails.addresses
     html_message = "<h1>Welcome to the app</h1>"
     subject = "Welcome to our app"
-    #send_email.delay(emails, subject, html)
-    bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
+    if celery_active:
+        send_email.delay(emails, subject, html_message)
+    else:
+        bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
     return {"message":"Email sent successfully"}
 
 @auth_router.post('/send_verification', status_code=status.HTTP_200_OK)
@@ -57,8 +64,10 @@ async def create_user_account(user_data:PasswordResetRequestModel, bg_tasks: Bac
     """
     emails = [email]
     subject="Verify your email"
-    #send_email.delay(emails, subject, html_message)
-    bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
+    if celery_active:
+        send_email.delay(emails, subject, html_message)
+    else:
+        bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
     
     return {
         "message" : f"Check your email: {email} to verify your account"
@@ -80,8 +89,10 @@ async def create_user_account(user_data:UserCreateModel, bg_tasks: BackgroundTas
     """
     emails = [email]
     subject="Verify your email"
-    #send_email.delay(emails, subject, html_message)
-    bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
+    if celery_active:
+        send_email.delay(emails, subject, html_message)
+    else:
+        bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
     
     return {
         "message" : f"Account Created! Check your email: {email} to verify your account",
@@ -192,8 +203,10 @@ async def password_reset_request(email_data:PasswordResetRequestModel, bg_tasks:
     """
     emails = [email]
     subject="Password Reset Request"
-    #send_email.delay(emails, subject, html_message)
-    bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
+    if celery_active:
+        send_email.delay(emails, subject, html_message)
+    else:
+        bg_tasks.add_task(send_email_via_api, emails, subject, html_message)
     
     return JSONResponse(content={"message" : f"Check your email: {email} to confirm password reset"},
                         status_code=status.HTTP_200_OK)
