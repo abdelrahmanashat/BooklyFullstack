@@ -7,7 +7,6 @@ from datetime import timedelta, datetime
 from src.db.main import get_session
 from src.db.redis import add_jti_to_blocklist
 from src.mail_non_celery import send_email_via_api
-from src.celery_tasks import send_email
 
 from .schemas import (UserCreateModel, 
                       UserLoginModel, 
@@ -26,6 +25,7 @@ from src.url_names import url_names
 
 if "localhost" in Config.DOMAIN or "127.0.0.1" in Config.DOMAIN:
     celery_active = True
+    from src.celery_tasks import send_email
 else:
     celery_active = False
 
