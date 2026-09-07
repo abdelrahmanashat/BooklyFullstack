@@ -1,6 +1,6 @@
 env/
+.vscode/
+.hypothesis/
 __pycache__
 .env
 .env.docker
-.vscode/
-.hypothesis/
