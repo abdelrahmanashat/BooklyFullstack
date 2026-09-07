@@ -1,7 +1,7 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
 from .schemas import BookCreateModel, BookUpdateModel
 from sqlmodel import select, desc
-from src.db.models import Book, Review, Tag, BookTag
+from src.db.models import Book, Review, Tag, BookTag, User
 from datetime import datetime
 
 class BookService:
@@ -22,9 +22,18 @@ class BookService:
         return result.all()
     
     async def get_book_reviews(self, book_uid:str, session:AsyncSession):
-        statement = select(Review).order_by(desc(Review.created_at)).where(Review.book_uid==book_uid)
+        statement = select(Review, User.username).join(User, isouter=True).where(Review.book_uid == book_uid)
         result = await session.exec(statement)
-        return result.all()
+        rows = result.all()
+    
+        # Map the tuples into a list of dictionaries for clean JSON serialization
+        reviews_with_usernames = []
+        for review, username in rows:
+            review_dict = review.model_dump() # Converts SQLModel/Pydantic object to dict
+            review_dict["username"] = username or "Anonymous"
+            reviews_with_usernames.append(review_dict)
+            
+        return reviews_with_usernames
     
     async def get_book_tags(self, book_uid:str, session:AsyncSession):
         statement = select(Tag).order_by(desc(Tag.created_at)).join(BookTag, Tag.uid==BookTag.tag_id).where(BookTag.book_id==book_uid)

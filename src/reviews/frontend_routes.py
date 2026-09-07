@@ -65,7 +65,7 @@ async def get(book_uid: uuid.UUID, request: Request):
             Div(
                 # Header: User & Rating
                 Div(
-                    Span(f"👤 User {str(review.get('user_uid', 'Anonymous'))[:8]}...", style="font-weight: 600; font-size: 0.85rem; color: #475569;"),
+                    Span(f"👤 User {str(review.get('username', 'Anonymous'))}", style="font-weight: 600; font-size: 0.85rem; color: #475569;"),
                     Span(stars, style="color: #fbbf24; font-size: 0.9rem; letter-spacing: 2px;"),
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),

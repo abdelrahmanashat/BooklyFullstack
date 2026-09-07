@@ -2,7 +2,7 @@ from fastapi import APIRouter, status, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List
 from src.books.schemas import Book, BookUpdateModel, BookCreateModel, BookDetailModel
-from src.reviews.schemas import ReviewModel
+from src.reviews.schemas import ReviewDetailModel
 from src.tags.schemas import TagCreateModel
 from src.db.main import get_session
 from src.books.service import BookService
@@ -50,12 +50,13 @@ async def get_book(book_uid:str,
     else:
         return book
 
-@book_router.get('/{book_uid}/reviews', response_model=list[ReviewModel], dependencies=[role_checker])
+@book_router.get('/{book_uid}/reviews', response_model=list[ReviewDetailModel], dependencies=[role_checker])
 async def get_reviews(book_uid:str, 
     session:AsyncSession=Depends(get_session), 
     token_details:dict = Depends(access_token_bearer)
 ) -> dict:
     reviews = await book_service.get_book_reviews(book_uid, session)
+    print(reviews)
     return reviews
 
 @book_router.get('/{book_uid}/tags', response_model=list[TagCreateModel], dependencies=[role_checker])

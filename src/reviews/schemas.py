@@ -10,7 +10,10 @@ class ReviewModel(BaseModel):
     review_text: str
     rating: int = Field(lt=6)
     created_at: datetime
-    update_at: datetime 
+    update_at: datetime
+
+class ReviewDetailModel(ReviewModel):
+    username: str 
 
 class ReviewCreateModel(BaseModel):
     review_text: str
