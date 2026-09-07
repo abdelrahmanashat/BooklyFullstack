@@ -37,52 +37,93 @@ async def get_books(request: Request):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    # NOTE: Added a trailing slash here since your routes_2.py defines it as get('/')
-    api_url = f"{current_url}{backend_prefix}/book/" 
+    # Get current user details
+    api_url = f"{current_url}{backend_prefix}/auth/me" 
+        
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        api_response = await client.get(api_url, headers=headers)
+    
+    # 1. Styled Error Card for Auth Failure
+    if api_response.status_code != 200:
+        error_msg = api_response.json().get("message", "Session expired or invalid.") if api_response.status_code != 500 else "Server Error."
+        return Titled("Session Error", Main(
+            Div(
+                H3("⚠️ Authentication Failed", style="color: #dc2626; margin-bottom: 10px;"),
+                P(error_msg, style="color: #475569; margin-bottom: 25px;"),
+                A("Go to Login", href=f"{frontend_prefix}/", cls="button primary", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px;"),
+                style="max-width: 450px; margin: 10vh auto; padding: 30px; text-align: center; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 12px;"
+            )
+        ), cls="container")
+    
+    user_uid = api_response.json()["uid"]
+    
+    # Get the user's books
+    api_url = f"{current_url}{backend_prefix}/books/user/{user_uid}" 
     
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
         
-    # FIX: Catch ALL errors, not just 401s!
+    # 2. Styled Error Card for Data Fetch Failure
     if api_response.status_code != 200:
-        try:
-            error_data = api_response.json()
-            error_msg = error_data.get("message", f"Failed to load books. Status: {api_response.status_code}")
-        except Exception:
-            error_msg = f"Server Error {api_response.status_code}: Something went wrong."
-            
-        return Titled("Error", Main(
-            P(error_msg, style="color: red;"),
-            A("Go to Login", href=f"{frontend_prefix}/", cls="button secondary outline")
+        error_msg = api_response.json().get("message", "Failed to load your library.") if api_response.status_code != 500 else "Server Error."
+        return Titled("Error Loading Library", Main(
+            Div(
+                H3("⚠️ Could Not Load Books", style="color: #dc2626; margin-bottom: 10px;"),
+                P(error_msg, style="color: #475569; margin-bottom: 25px;"),
+                A("Try Again", href=f"{frontend_prefix}/books", cls="button primary", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px;"),
+                style="max-width: 450px; margin: 10vh auto; padding: 30px; text-align: center; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 12px;"
+            )
         ), cls="container")
         
     books_data = api_response.json() 
     
-    # Build the interactive library list
-    books_list = Ul(*[
-        Li(
-            Strong(book.get("title", "Untitled")),
-            
+    # 3. Friendly Empty State UX
+    if not books_data:
+        books_list = Div(
+            H3("📚 Your library is empty", style="color: #475569; margin-bottom: 10px;"),
+            P("Start building your collection by adding your first book.", style="color: #64748b; margin-bottom: 25px;"),
+            A("+ Add New Book", href=f"{frontend_prefix}/books/create", cls="button primary", style="padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600;"),
+            style="text-align: center; padding: 60px 20px; background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; margin-top: 20px;"
+        )
+    # 4. Modern Card-Based List
+    else:
+        books_list = Div(*[
             Div(
-                Button("Details", 
-                       hx_get=f"{frontend_prefix}/books/{book.get('uid')}", 
-                       hx_target=f"#book-wrapper-{book.get('uid')}", 
-                       hx_swap="innerHTML"
+                Div(
+                    Strong(book.get("title", "Untitled"), style="font-size: 1.15rem; color: #0f172a; display: block; margin-bottom: 4px;"),
+                    Span(f"By {book.get('author', 'Unknown')}", style="color: #64748b; font-size: 0.9rem;"),
+                    style="flex-grow: 1; margin-bottom: 10px;"
                 ),
-                id=f"book-wrapper-{book.get('uid')}",
-                style="margin-top: 5px;"
-            )
-        ) for book in books_data
-    ])
+                # The wrapper for HTMX to expand the submenu into
+                Div(
+                    Button("▼ Details", 
+                           hx_get=f"{frontend_prefix}/books/{book.get('uid')}", 
+                           hx_target=f"#book-wrapper-{book.get('uid')}", 
+                           hx_swap="innerHTML",
+                           cls="button secondary outline",
+                           style="font-size: 0.85rem; padding: 6px 14px;"
+                    ),
+                    id=f"book-wrapper-{book.get('uid')}",
+                ),
+                style="padding: 20px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.05);"
+            ) for book in books_data
+        ], style="display: flex; flex-direction: column; max-width: 800px; margin: 0 auto;")
     
-    return Titled("My Library", Main(
+    # 5. Clean Top Navigation Header
+    top_nav = Div(
+        H2("My Library", style="margin: 0; color: #1e293b; font-size: 1.75rem;"),
         Div(
-            A("+ Add New Book", href=f"{frontend_prefix}/books/create", cls="button primary"),
-            A("Logout", href=f"{frontend_prefix}/logout", cls="button secondary outline", style="float: right;"),
-            style="margin-bottom: 20px;"
+            A("+ Add Book", href=f"{frontend_prefix}/books/create", cls="button primary", style="margin-right: 12px; border-radius: 6px; font-weight: 600;"),
+            A("Logout", href=f"{frontend_prefix}/logout", cls="button secondary outline", style="border-radius: 6px;"),
+            style="display: flex; align-items: center;"
         ),
-        Hr(),
-        books_list
+        style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 25px; max-width: 800px; margin-left: auto; margin-right: auto;"
+    )
+    
+    return Titled("Bookly Dashboard", Main(
+        top_nav,
+        books_list,
+        style="padding-top: 20px; padding-bottom: 40px;"
     ), cls="container")
 
 # ==========================================
@@ -101,10 +142,23 @@ def get(request: Request):
         submit_text="Save Book"
     )
     
+    # 1. Styled Cancel Link
+    cancel_link = Div(
+        A("← Back to Library", href=f"{frontend_prefix}/books", style="font-size: 0.95rem; color: #64748b; text-decoration: none; font-weight: 600;"),
+        style="margin-top: 20px; text-align: center;"
+    )
+    
+    # 2. Centered Layout with Descriptive Headers
     return Titled("Add a Book", Main(
-        form, 
-        P(A("Cancel & Back to Library", href=f"{frontend_prefix}/books", cls="secondary"))
+        Div(
+            H2("Add a New Book", style="text-align: center; color: #1e293b; margin-bottom: 8px;"),
+            P("Enter the details of the book to add it to your personal library.", style="text-align: center; color: #64748b; margin-bottom: 30px;"),
+            form, 
+            cancel_link,
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 75vh;"
+        )
     ), cls="container")
+
 
 @rt('/books/create')
 @accept_model_fields(BookCreateModel)
@@ -113,7 +167,7 @@ async def post(request: Request, **kwargs):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    api_url = f"{current_url}{backend_prefix}/book"
+    api_url = f"{current_url}{backend_prefix}/books"
     payload = {key: val for key, val in kwargs.items()}
     
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -124,14 +178,19 @@ async def post(request: Request, **kwargs):
         return RedirectResponse(url=f"{frontend_prefix}/books", status_code=303)
     else:
         try:
-            error_data = api_response.json()
-            error_msg = error_data.get("message", "Failed to add book.")
+            error_msg = api_response.json().get("message", "Failed to add book.")
         except Exception:
             error_msg = f"Server Error {api_response.status_code}: Something went wrong."
             
-        return Titled("Error", Main(
-            P(error_msg, style="color: red;"),
-            A("Try Again", href=f"{frontend_prefix}/books/create", cls="button secondary")
+        # 3. Styled Error Card
+        return Titled("Error Adding Book", Main(
+            Div(
+                H3("⚠️ Could Not Save Book", style="color: #dc2626; margin-bottom: 10px;"),
+                P(error_msg, style="color: #475569; margin-bottom: 25px;"),
+                A("Try Again", href=f"{frontend_prefix}/books/create", cls="button primary", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px; margin-bottom: 10px;"),
+                A("Cancel", href=f"{frontend_prefix}/books", cls="button secondary outline", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px;"),
+                style="max-width: 450px; margin: 10vh auto; padding: 30px; text-align: center; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 12px;"
+            )
         ), cls="container")
 
 # ==========================================
@@ -144,7 +203,7 @@ async def get(uid: uuid.UUID, request: Request):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
 
-    api_url = f"{current_url}{backend_prefix}/book/{uid}"
+    api_url = f"{current_url}{backend_prefix}/books/{uid}"
     
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
@@ -152,51 +211,89 @@ async def get(uid: uuid.UUID, request: Request):
     if api_response.status_code == 401:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
     elif api_response.status_code != 200:
-        return Div(P("⚠️ Could not load details.", style="color: red;"))
+        return Div(P("⚠️ Could not load details.", style="color: #dc2626; font-size: 0.9rem; margin-top: 10px;"))
         
     book = api_response.json()
     
+    # 1. Refined Tag Pills
+    tags_data = book.get("tags", [])
+    if tags_data:
+        tags_ui = Div(
+            *[Span(
+                tag.get("name", "Unknown") if isinstance(tag, dict) else str(tag), 
+                style="display: inline-block; background-color: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 16px; font-size: 0.75rem; font-weight: 600; margin-right: 8px; margin-bottom: 8px; border: 1px solid #bae6fd;"
+            ) for tag in tags_data],
+            style="margin-bottom: 15px;"
+        )
+    else:
+        tags_ui = P("No tags added yet.", style="font-size: 0.85rem; color: #94a3b8; font-style: italic; margin-bottom: 15px;")
+
+    # 2. Modern Grid Layout for Book Metadata (Replacing Ul/Li)
+    metadata_grid = Div(
+        Div(Span("Author", style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block;"), Span(book.get("author", "N/A"), style="font-weight: 500; color: #1e293b; font-size: 0.95rem;")),
+        Div(Span("Publisher", style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block;"), Span(book.get("publisher", "N/A"), style="font-weight: 500; color: #1e293b; font-size: 0.95rem;")),
+        Div(Span("Published", style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block;"), Span(book.get("published_date", "N/A"), style="font-weight: 500; color: #1e293b; font-size: 0.95rem;")),
+        Div(Span("Pages", style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block;"), Span(str(book.get("page_count", 0)), style="font-weight: 500; color: #1e293b; font-size: 0.95rem;")),
+        Div(Span("Language", style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block;"), Span(book.get("language", "N/A"), style="font-weight: 500; color: #1e293b; font-size: 0.95rem;")),
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; margin-bottom: 20px; background-color: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;"
+    )
+
+    # 3. Clean Action Buttons Row
+    actions_ui = Div(
+        A("✏️ Edit", href=f"{frontend_prefix}/books/{uid}/edit", cls="button secondary outline", style="font-size: 0.85rem; padding: 6px 12px; border-radius: 6px;"),
+        A("🏷️ Add Tag", href=f"{frontend_prefix}/books/{uid}/tags/add", cls="button secondary outline", style="font-size: 0.85rem; padding: 6px 12px; border-radius: 6px;"),
+        A("⭐ Add Review", href=f"{frontend_prefix}/books/{uid}/reviews/create", cls="button secondary outline", style="font-size: 0.85rem; padding: 6px 12px; border-radius: 6px;"),
+        A("🗑️ Delete", href=f"{frontend_prefix}/books/{uid}/delete", cls="button danger", style="font-size: 0.85rem; padding: 6px 12px; border-radius: 6px;"),
+        style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;"
+    )
+
+    # Inline CSS for the fade-in animation
+    fade_in_style = Style("@keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }")
+
     # Returns a tuple: The new "Hide" button, AND the details card
     return (
-        Button("Hide Details", 
+        Button("▲ Hide Details", 
                hx_get=f"{frontend_prefix}/books/{uid}/close", 
                hx_target=f"#book-wrapper-{uid}", 
                hx_swap="innerHTML",
-               cls="secondary outline" 
+               cls="button secondary",
+               style="font-size: 0.85rem; padding: 6px 14px; background-color: #f1f5f9; color: #475569; border: none;"
         ),
         Div(
-            H3(book.get("title", "Unknown Title"), style="margin-bottom: 5px;"),
-            Hr(),
-            Ul(
-                Li(B("Author: "), book.get("author", "N/A")),
-                Li(B("Publisher: "), book.get("publisher", "N/A")),
-                Li(B("Published: "), book.get("published_date", "N/A")),
-                Li(B("Pages: "), str(book.get("page_count", 0))),
-                Li(B("Language: "), book.get("language", "N/A"))
+            fade_in_style,
+            H3(book.get("title", "Unknown Title"), style="margin-top: 0; margin-bottom: 10px; color: #0f172a; font-size: 1.25rem;"),
+            tags_ui,
+            
+            metadata_grid,
+            actions_ui,
+            
+            Hr(style="margin: 0 0 20px 0; border-top: 1px solid #e2e8f0;"),
+            
+            # 4. Reviews section with header
+            Div(
+                H4("Reader Reviews:", style="margin-top: 0; margin-bottom: 15px; color: #1e293b; font-size: 1.1rem;"),
+                Div(
+                    hx_get=f"{frontend_prefix}/books/{uid}/reviews",
+                    hx_trigger="load",
+                    hx_swap="innerHTML",
+                    style="min-height: 50px; color: #475569;"
+                )
             ),
-            # Optional: Edit button linking to an update route
-            A("Edit Book", href=f"{frontend_prefix}/books/{uid}/edit", cls="button secondary", style="margin-top: 10px; font-size: 0.8rem;"),
-            A("Delete Book", href=f"{frontend_prefix}/books/{uid}/delete", cls="button danger", style="margin-top: 10px; font-size: 0.8rem; background-color: #d9534f; color: white; border: none;"),
-            A("+ Add Tag", href=f"{frontend_prefix}/books/{uid}/tags/add", cls="button secondary outline", style="margin-top: 10px; font-size: 0.8rem; margin-left: 10px;"),
-            style="padding: 15px; border: 1px solid #ccc; border-radius: 8px; margin-top: 10px; background-color: #f9f9f9;"
-        ),
-        Div(
-            # This fetches the reviews automatically when the book details card is rendered!
-            hx_get=f"{frontend_prefix}/books/{uid}/reviews",
-            hx_trigger="load",
-            hx_swap="innerHTML"
+            
+            style="padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; margin-top: 12px; background-color: #f8fafc; box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.02); animation: fadeIn 0.3s ease-out forwards;"
         )
     )
 
 @rt('/books/{uid}/close')
 async def close_book_details(uid: uuid.UUID):
     # Returns JUST the original button, effectively erasing the submenu card
-    return Button("Details", 
+    return Button("▼ Details", 
         hx_get=f"{frontend_prefix}/books/{uid}", 
         hx_target=f"#book-wrapper-{uid}", 
-        hx_swap="innerHTML"
+        hx_swap="innerHTML",
+        cls="button secondary outline",
+        style="font-size: 0.85rem; padding: 6px 14px;"
     )
-
 # ==========================================
 # UPDATE BOOK
 # ==========================================
@@ -207,8 +304,8 @@ async def get(uid: uuid.UUID, request: Request):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    # 1. (Optional) Fetch the existing book so you can display its current title
-    api_url = f"{current_url}{backend_prefix}/book/{uid}"
+    # 1. Fetch the existing book so you can display its current title
+    api_url = f"{current_url}{backend_prefix}/books/{uid}"
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
         
@@ -217,17 +314,31 @@ async def get(uid: uuid.UUID, request: Request):
         
     book = api_response.json()
     
-    # 2. Generate the update form
+    # 2. Generate the update form (our upgraded utility handles the styling!)
     form = generate_form_from_model(
         model=BookUpdateModel,
         submit_url=f"{frontend_prefix}/books/{uid}/edit",
-        submit_text="Save Changes"
+        submit_text="Save Changes",
+        initial_data=book
     )
     
-    return Titled(f"Edit: {book.get('title')}", Main(
-        form, 
-        P(A("Cancel", href=f"{frontend_prefix}/books", cls="secondary outline"))
+    # 3. Styled Cancel Link
+    cancel_link = Div(
+        A("← Back to Library", href=f"{frontend_prefix}/books", style="font-size: 0.95rem; color: #64748b; text-decoration: none; font-weight: 600;"),
+        style="margin-top: 20px; text-align: center;"
+    )
+    
+    # 4. Centered Layout with Contextual Headers
+    return Titled("Edit Book", Main(
+        Div(
+            H2("Edit Book Details", style="text-align: center; color: #1e293b; margin-bottom: 8px;"),
+            P("Updating: ", B(book.get('title', 'Unknown Book'), style="color: #0f172a;"), style="text-align: center; color: #64748b; margin-bottom: 30px;"),
+            form, 
+            cancel_link,
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 75vh;"
+        )
     ), cls="container")
+
 
 @rt('/books/{uid}/edit')
 @accept_model_fields(BookUpdateModel)
@@ -236,7 +347,7 @@ async def post(uid: uuid.UUID, request: Request, **kwargs):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    api_url = f"{current_url}{backend_prefix}/book/{uid}"
+    api_url = f"{current_url}{backend_prefix}/books/{uid}"
     
     # Filter out empty fields if BookUpdateModel makes them optional
     payload = {key: val for key, val in kwargs.items() if val is not None and val != ""}
@@ -253,9 +364,15 @@ async def post(uid: uuid.UUID, request: Request, **kwargs):
         except Exception:
             error_msg = f"Server Error {api_response.status_code}: Something went wrong."
             
-        return Titled("Error", Main(
-            P(error_msg, style="color: red;"),
-            A("Try Again", href=f"{frontend_prefix}/books/{uid}/edit", cls="button secondary")
+        # 5. Styled Error Card
+        return Titled("Update Failed", Main(
+            Div(
+                H3("⚠️ Could Not Save Changes", style="color: #dc2626; margin-bottom: 10px;"),
+                P(error_msg, style="color: #475569; margin-bottom: 25px;"),
+                A("Try Again", href=f"{frontend_prefix}/books/{uid}/edit", cls="button primary", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px; margin-bottom: 10px;"),
+                A("Cancel", href=f"{frontend_prefix}/books", cls="button secondary outline", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px;"),
+                style="max-width: 450px; margin: 10vh auto; padding: 30px; text-align: center; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 12px;"
+            )
         ), cls="container")
 
 # ==========================================
@@ -269,7 +386,7 @@ async def get(uid: uuid.UUID, request: Request):
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
     # Fetch the book to show the user what they are deleting
-    api_url = f"{current_url}{backend_prefix}/book/{uid}"
+    api_url = f"{current_url}{backend_prefix}/books/{uid}"
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
         
@@ -278,20 +395,29 @@ async def get(uid: uuid.UUID, request: Request):
         
     book = api_response.json()
     
+    # 1. Prominent, Centered Warning Card Layout
     return Titled("Delete Book", Main(
-        H3(f"Are you sure you want to delete '{book.get('title')}'?"),
-        P("This action cannot be undone.", style="color: red;"),
-        
-        # A simple form that submits a POST request to trigger the deletion
-        Form(
-            Button("Yes, Delete Book", type="submit", cls="button danger", style="background-color: #d9534f; color: white; border: none;"),
-            action=f"{frontend_prefix}/books/{uid}/delete",
-            method="post",
-            style="display: inline-block; margin-right: 10px;"
-        ),
-        A("Cancel", href=f"{frontend_prefix}/books", cls="button secondary outline"),
-        
-        style="text-align: center; margin-top: 50px;"
+        Div(
+            H1("⚠️", style="font-size: 3.5rem; margin-bottom: 10px; line-height: 1;"),
+            H2("Delete Book?", style="color: #0f172a; margin-bottom: 15px;"),
+            
+            P("Are you absolutely sure you want to delete ", B(book.get('title', 'this book')), "?", style="color: #475569; font-size: 1.05rem; margin-bottom: 10px;"),
+            P("This action cannot be undone. It will permanently remove this book and detach all associated tags and reviews.", style="color: #dc2626; font-size: 0.9rem; margin-bottom: 30px; line-height: 1.5;"),
+            
+            # 2. Side-by-Side Flexbox Buttons
+            Div(
+                A("Cancel", href=f"{frontend_prefix}/books", cls="button secondary outline", style="flex: 1; text-align: center; padding: 0.75rem; border-radius: 8px; font-weight: 600;"),
+                Form(
+                    Button("Yes, Delete", type="submit", cls="button danger", style="width: 100%; padding: 0.75rem; border-radius: 8px; font-weight: 600; background-color: #dc2626; color: white; border: none;"),
+                    action=f"{frontend_prefix}/books/{uid}/delete",
+                    method="post",
+                    style="flex: 1; margin: 0;"
+                ),
+                style="display: flex; gap: 15px; width: 100%;"
+            ),
+            
+            style="max-width: 450px; margin: 15vh auto; padding: 40px 30px; text-align: center; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);"
+        )
     ), cls="container")
 
 @rt('/books/{uid}/delete')
@@ -300,7 +426,7 @@ async def post(uid: uuid.UUID, request: Request):
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    api_url = f"{current_url}{backend_prefix}/book/{uid}"
+    api_url = f"{current_url}{backend_prefix}/books/{uid}"
     
     # Issue the DELETE request to the backend
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -314,7 +440,12 @@ async def post(uid: uuid.UUID, request: Request):
         except Exception:
             error_msg = f"Server Error {api_response.status_code}: Something went wrong."
             
-        return Titled("Error", Main(
-            P(error_msg, style="color: red;"),
-            A("Back to Library", href=f"{frontend_prefix}/books", cls="button secondary")
+        # 3. Standardized Error Card
+        return Titled("Deletion Failed", Main(
+            Div(
+                H3("⚠️ Could Not Delete Book", style="color: #dc2626; margin-bottom: 10px;"),
+                P(error_msg, style="color: #475569; margin-bottom: 25px;"),
+                A("Back to Library", href=f"{frontend_prefix}/books", cls="button secondary outline", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px;"),
+                style="max-width: 450px; margin: 10vh auto; padding: 30px; text-align: center; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 12px;"
+            )
         ), cls="container")

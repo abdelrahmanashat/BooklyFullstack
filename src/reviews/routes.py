@@ -31,7 +31,7 @@ async def get_review(review_uid: str, session: AsyncSession = Depends(get_sessio
     return review
 
 
-@review_router.post("/book/{book_uid}", dependencies=[user_role_checker])
+@review_router.post("/books/{book_uid}", dependencies=[user_role_checker])
 async def add_review_to_books(
     book_uid: str,
     review_data: ReviewCreateModel,

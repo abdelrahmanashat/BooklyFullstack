@@ -3,6 +3,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List
 from src.books.schemas import Book, BookUpdateModel, BookCreateModel, BookDetailModel
 from src.reviews.schemas import ReviewModel
+from src.tags.schemas import TagCreateModel
 from src.db.main import get_session
 from src.books.service import BookService
 from src.auth.dependencies import AccessTokenBearer, RoleChecker
@@ -49,13 +50,21 @@ async def get_book(book_uid:str,
     else:
         return book
 
-@book_router.get('/{book_uid}/reviews', response_model=ReviewModel, dependencies=[role_checker])
+@book_router.get('/{book_uid}/reviews', response_model=list[ReviewModel], dependencies=[role_checker])
 async def get_reviews(book_uid:str, 
     session:AsyncSession=Depends(get_session), 
     token_details:dict = Depends(access_token_bearer)
 ) -> dict:
     reviews = await book_service.get_book_reviews(book_uid, session)
     return reviews
+
+@book_router.get('/{book_uid}/tags', response_model=list[TagCreateModel], dependencies=[role_checker])
+async def get_tags(book_uid:str, 
+    session:AsyncSession=Depends(get_session), 
+    token_details:dict = Depends(access_token_bearer)
+) -> dict:
+    tags = await book_service.get_book_tags(book_uid, session)
+    return tags
 
 @book_router.patch('/{book_uid}', response_model=Book, dependencies=[role_checker])
 async def update_book(book_uid:str, 

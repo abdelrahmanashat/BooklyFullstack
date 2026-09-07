@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from src.books.routes import book_router
 from src.auth.routes import auth_router
 from src.reviews.routes import review_router
@@ -7,7 +8,9 @@ from .errors import register_all_errors
 from .middleware import register_middleware
 from .url_names import url_names
 
+####################
 # Initialize Backend
+####################
 
 version_prefix = url_names.version_prefix
 
@@ -26,12 +29,20 @@ app = FastAPI(
 register_all_errors(app)
 register_middleware(app)
 
-app.include_router(book_router, prefix=f"{version_prefix}/book", tags=['books'])
+app.include_router(book_router, prefix=f"{version_prefix}/books", tags=['books'])
 app.include_router(auth_router, prefix=f"{version_prefix}/auth", tags=['auth'])
 app.include_router(review_router, prefix=f"{version_prefix}/reviews", tags=['reviews'])
 app.include_router(tags_router, prefix=f"{version_prefix}/tags", tags=["tags"])
 
+# Catch anyone visiting the base domain (e.g., localhost:8000/) 
+# and redirect them to the frontend UI.
+@app.get("/", include_in_schema=False)
+def root_redirect():
+    return RedirectResponse(url=url_names.frontend_url, status_code=303)
+
+#####################
 # Initialize Frontend
+#####################
 
 from fasthtml.common import fast_app
 

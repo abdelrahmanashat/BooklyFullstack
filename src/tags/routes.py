@@ -39,7 +39,7 @@ async def add_tag(
 
 
 @tags_router.post(
-    "/book/{book_uid}/tags", response_model=Book, dependencies=[user_role_checker]
+    "/books/{book_uid}/tags", response_model=Book, dependencies=[user_role_checker]
 )
 async def add_tags_to_book(
     book_uid: str, tag_data: TagAddModel, session: AsyncSession = Depends(get_session)

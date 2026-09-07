@@ -33,48 +33,65 @@ def get_auth_headers(request: Request):
 # This route returns a list of reviews that you can inject into your book details UI
 
 @rt('/books/{book_uid}/reviews')
-async def get_book_reviews(book_uid: uuid.UUID, request: Request):
+async def get(book_uid: uuid.UUID, request: Request):
     headers = get_auth_headers(request)
     if not headers:
-        return P("Please log in to view reviews.", style="color: red;")
+        return P("Please log in to view reviews.", style="color: #dc2626; font-size: 0.9rem;")
         
-    api_url = f"{current_url}{backend_prefix}/book/{book_uid}/reviews" 
+    api_url = f"{current_url}{backend_prefix}/books/{book_uid}/reviews" 
     
     async with httpx.AsyncClient(follow_redirects=True) as client:
         api_response = await client.get(api_url, headers=headers)
         
     if api_response.status_code != 200:
-        return P("⚠️ Could not load reviews.", style="color: grey;")
+        return P("⚠️ Could not load reviews.", style="color: #64748b; font-size: 0.9rem;")
         
     reviews_data = api_response.json()
     
     if not reviews_data:
-        return P("No reviews yet. Be the first to review!", style="font-style: italic; color: grey;")
+        return P("No reviews yet. Be the first to share your thoughts!", style="font-style: italic; color: #94a3b8; font-size: 0.95rem; text-align: center; padding: 20px 0;")
     
-    # Build a simple UI list for the reviews
-    reviews_list = Ul(*[
-        Li(
-            Strong(f"Rating: {review.get('rating', 'N/A')}/5"),
-            P(review.get('comment', 'No comment provided.'), style="margin: 5px 0;"),
-            Small(f"By User: {review.get('user_uid', 'Anonymous')}", style="color: grey;"),
-            
-            # Add these action links:
+    # Build a clean, styled UI list for the reviews
+    review_items = []
+    for review in reviews_data:
+        # Convert numerical rating to visual stars safely
+        try:
+            rating_val = int(review.get('rating', 0))
+            stars = "⭐" * rating_val + "☆" * (5 - rating_val)
+        except (ValueError, TypeError):
+            stars = "No rating"
+
+        review_items.append(
             Div(
-                A("Edit", href=f"{frontend_prefix}/books/{book_uid}/reviews/{review.get('uid')}/edit", style="font-size: 0.8rem; margin-right: 10px;"),
-                A("Delete", href=f"{frontend_prefix}/books/{book_uid}/reviews/{review.get('uid')}/delete", style="font-size: 0.8rem; color: #d9534f;"),
-                style="margin-top: 5px;"
-            ),
-            
-            style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;"
-        ) for review in reviews_data
-    ], style="list-style-type: none; padding-left: 0;")
+                # Header: User & Rating
+                Div(
+                    Span(f"👤 User {str(review.get('user_uid', 'Anonymous'))[:8]}...", style="font-weight: 600; font-size: 0.85rem; color: #475569;"),
+                    Span(stars, style="color: #fbbf24; font-size: 0.9rem; letter-spacing: 2px;"),
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
+                ),
+                
+                # Review Text
+                P(f"\"{review.get('review_text', 'No comment provided.')}\"", style="margin: 0 0 12px 0; color: #1e293b; font-size: 0.95rem; line-height: 1.5; font-style: italic;"),
+                
+                # Action: Delete (Aligned Right)
+                Div(
+                    A("🗑️ Delete", href=f"{frontend_prefix}/books/{book_uid}/reviews/{review.get('uid')}/delete", style="font-size: 0.75rem; color: #ef4444; text-decoration: none; font-weight: 600;"),
+                    style="text-align: right;"
+                ),
+                
+                style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 12px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);"
+            )
+        )
+        
+    return Div(*review_items)
+
 
 # ==========================================
 # CREATE A REVIEW
 # ==========================================
 
 @rt('/books/{book_uid}/reviews/create')
-def get_create_review(book_uid: uuid.UUID, request: Request):
+def get(book_uid: uuid.UUID, request: Request):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
@@ -85,71 +102,93 @@ def get_create_review(book_uid: uuid.UUID, request: Request):
         submit_text="Submit Review"
     )
     
+    cancel_link = Div(
+        A("← Back to Library", href=f"{frontend_prefix}/books", style="font-size: 0.95rem; color: #64748b; text-decoration: none; font-weight: 600;"),
+        style="margin-top: 20px; text-align: center;"
+    )
+    
     return Titled("Add a Review", Main(
-        form, 
-        P(A("Cancel", href=f"{frontend_prefix}/books", cls="secondary"))
+        Div(
+            H2("Write a Review", style="text-align: center; color: #1e293b; margin-bottom: 8px;"),
+            P("Share your thoughts and rate this book out of 5.", style="text-align: center; color: #64748b; margin-bottom: 30px;"),
+            form, 
+            cancel_link,
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 75vh;"
+        )
     ), cls="container")
 
 @rt('/books/{book_uid}/reviews/create')
 @accept_model_fields(ReviewCreateModel)
-async def post_create_review(book_uid: uuid.UUID, request: Request, **kwargs):
+async def post(book_uid: uuid.UUID, request: Request, **kwargs):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    api_url = f"{current_url}{backend_prefix}/book/{book_uid}/reviews"
+    api_url = f"{current_url}{backend_prefix}/reviews/books/{book_uid}"
     payload = {key: val for key, val in kwargs.items()}
     
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
         api_response = await client.post(api_url, json=payload, headers=headers)
         
     if api_response.status_code in (200, 201):
-        # Redirect back to the library upon success
         return RedirectResponse(url=f"{frontend_prefix}/books", status_code=303)
     else:
         try:
-            error_data = api_response.json()
-            error_msg = error_data.get("message", "Failed to add review.")
+            error_msg = api_response.json().get("message", "Failed to add review.")
         except Exception:
             error_msg = f"Server Error {api_response.status_code}: Something went wrong."
             
-        return Titled("Error", Main(
-            P(error_msg, style="color: red;"),
-            A("Try Again", href=f"{frontend_prefix}/books/{book_uid}/reviews/create", cls="button secondary")
+        return Titled("Error Adding Review", Main(
+            Div(
+                H3("⚠️ Could Not Save Review", style="color: #dc2626; margin-bottom: 10px;"),
+                P(error_msg, style="color: #475569; margin-bottom: 25px;"),
+                A("Try Again", href=f"{frontend_prefix}/books/{book_uid}/reviews/create", cls="button primary", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px; margin-bottom: 10px;"),
+                A("Cancel", href=f"{frontend_prefix}/books", cls="button secondary outline", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px;"),
+                style="max-width: 450px; margin: 10vh auto; padding: 30px; text-align: center; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 12px;"
+            )
         ), cls="container")
+        
         
 # ==========================================
 # DELETE REVIEW
 # ==========================================
 
 @rt('/books/{book_uid}/reviews/{review_uid}/delete')
-async def get_delete_review(book_uid: uuid.UUID, review_uid: uuid.UUID, request: Request):
+async def get(book_uid: uuid.UUID, review_uid: uuid.UUID, request: Request):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
     return Titled("Delete Review", Main(
-        H3("Are you sure you want to delete this review?"),
-        P("This action cannot be undone.", style="color: red;"),
-        
-        Form(
-            Button("Yes, Delete Review", type="submit", cls="button danger", style="background-color: #d9534f; color: white; border: none;"),
-            action=f"{frontend_prefix}/books/{book_uid}/reviews/{review_uid}/delete",
-            method="post",
-            style="display: inline-block; margin-right: 10px;"
-        ),
-        A("Cancel", href=f"{frontend_prefix}/books", cls="button secondary outline"),
-        
-        style="text-align: center; margin-top: 50px;"
+        Div(
+            H1("⚠️", style="font-size: 3.5rem; margin-bottom: 10px; line-height: 1;"),
+            H2("Delete Review?", style="color: #0f172a; margin-bottom: 15px;"),
+            
+            P("Are you sure you want to delete this review?", style="color: #475569; font-size: 1.05rem; margin-bottom: 10px; font-weight: 600;"),
+            P("This action cannot be undone and the review will be permanently removed from this book.", style="color: #dc2626; font-size: 0.9rem; margin-bottom: 30px; line-height: 1.5;"),
+            
+            # Side-by-Side Flexbox Buttons
+            Div(
+                A("Cancel", href=f"{frontend_prefix}/books", cls="button secondary outline", style="flex: 1; text-align: center; padding: 0.75rem; border-radius: 8px; font-weight: 600;"),
+                Form(
+                    Button("Yes, Delete", type="submit", cls="button danger", style="width: 100%; padding: 0.75rem; border-radius: 8px; font-weight: 600; background-color: #dc2626; color: white; border: none;"),
+                    action=f"{frontend_prefix}/books/{book_uid}/reviews/{review_uid}/delete",
+                    method="post",
+                    style="flex: 1; margin: 0;"
+                ),
+                style="display: flex; gap: 15px; width: 100%;"
+            ),
+            
+            style="max-width: 450px; margin: 15vh auto; padding: 40px 30px; text-align: center; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);"
+        )
     ), cls="container")
 
 @rt('/books/{book_uid}/reviews/{review_uid}/delete')
-async def post_delete_review(book_uid: uuid.UUID, review_uid: uuid.UUID, request: Request):
+async def post(book_uid: uuid.UUID, review_uid: uuid.UUID, request: Request):
     headers = get_auth_headers(request)
     if not headers:
         return RedirectResponse(url=f"{frontend_prefix}/", status_code=303)
         
-    # Adjust this URL if your backend expects a nested path
     api_url = f"{current_url}{backend_prefix}/reviews/{review_uid}"
     
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -163,7 +202,11 @@ async def post_delete_review(book_uid: uuid.UUID, review_uid: uuid.UUID, request
         except Exception:
             error_msg = f"Server Error {api_response.status_code}: Something went wrong."
             
-        return Titled("Error", Main(
-            P(error_msg, style="color: red;"),
-            A("Back to Library", href=f"{frontend_prefix}/books", cls="button secondary")
+        return Titled("Deletion Failed", Main(
+            Div(
+                H3("⚠️ Could Not Delete Review", style="color: #dc2626; margin-bottom: 10px;"),
+                P(error_msg, style="color: #475569; margin-bottom: 25px;"),
+                A("Back to Library", href=f"{frontend_prefix}/books", cls="button secondary outline", style="display: block; width: 100%; text-align: center; padding: 0.75rem; border-radius: 8px;"),
+                style="max-width: 450px; margin: 10vh auto; padding: 30px; text-align: center; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 12px;"
+            )
         ), cls="container")
