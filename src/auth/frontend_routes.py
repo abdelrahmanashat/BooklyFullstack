@@ -238,7 +238,6 @@ def get():
 @accept_model_fields(UserCreateModel)
 async def post(**kwargs):
     api_url = f"{current_url}{backend_prefix}/auth/signup"
-    print("api_url: ", api_url)
     
     payload = {key: val for key, val in kwargs.items()}
     
